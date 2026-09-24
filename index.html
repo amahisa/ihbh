@@ -1,0 +1,398 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#1B2B45">
+<title>来たことある？</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
+<style>
+:root{
+  --ai:#1B2B45; --ai-2:#233756; --ai-3:#2E4570;
+  --kinari:#EFE8D8; --dim:#9AA7BB;
+  --brass:#C9A54A; --asagi:#6FB7AE; --beni:#E07A6A;
+  --serif:"Noto Serif JP","Noto Serif CJK JP","Hiragino Mincho ProN","Yu Mincho",serif;
+  --sans:system-ui,"Noto Sans JP","Hiragino Sans",sans-serif;
+  color-scheme:dark; box-sizing:border-box;
+  padding-top:env(safe-area-inset-top,0px);
+}
+*,*::before,*::after{box-sizing:inherit}
+html,body{margin:0;background:var(--ai);color:var(--kinari);font-family:var(--sans);line-height:1.6}
+body{min-height:100dvh}
+button,input{font:inherit;color:inherit}
+button{cursor:pointer}
+:focus-visible{outline:2px solid var(--brass);outline-offset:3px}
+
+header{display:flex;align-items:center;justify-content:space-between;padding:14px 20px 0;max-width:560px;margin:0 auto}
+h1{font-family:var(--serif);font-weight:600;font-size:1.15rem;letter-spacing:.08em;margin:0}
+.icon-btn{background:none;border:0;padding:8px;border-radius:50%;color:var(--dim);display:grid;place-items:center}
+.icon-btn:hover{color:var(--kinari)}
+
+main{max-width:560px;margin:0 auto;padding:8px 20px calc(120px + env(safe-area-inset-bottom,0px))}
+
+/* ---- stamp: the one bold element ---- */
+.stage{display:grid;place-items:center;padding:28px 0 18px;min-height:300px}
+.stamp{width:236px;height:236px;border-radius:50%;
+  border:4px solid var(--c,var(--brass));color:var(--c,var(--brass));
+  display:grid;place-items:center;text-align:center;transform:rotate(-7deg);position:relative;
+  font-family:var(--serif)}
+.stamp::before{content:"";position:absolute;inset:9px;border-radius:50%;border:1.5px solid currentColor;opacity:.8}
+.stamp .top{font-size:.9rem;letter-spacing:.3em;margin-bottom:2px}
+.stamp .big{font-size:2.05rem;font-weight:700;letter-spacing:.02em;line-height:1.15;font-variant-numeric:tabular-nums}
+.stamp .bottom{font-size:1.05rem;margin-top:6px;letter-spacing:.06em}
+.stamp.first{--c:var(--asagi)}
+.stamp.wait{--c:var(--dim);border-style:dashed}
+.stamp.wait::before{border-style:dashed}
+.stamp.press{animation:press .42s cubic-bezier(.2,.9,.3,1.2)}
+@keyframes press{from{transform:rotate(-7deg) scale(1.35);opacity:0}to{transform:rotate(-7deg) scale(1);opacity:1}}
+@media (prefers-reduced-motion:reduce){.stamp.press{animation:none}}
+
+.where{text-align:center;color:var(--dim);font-size:.82rem;margin:0 0 4px;font-variant-numeric:tabular-nums}
+.summary{text-align:center;margin:0 0 20px;font-size:.95rem}
+.summary .first-day{color:var(--dim)}
+
+.radius{display:flex;gap:8px;justify-content:center;margin:0 0 26px;flex-wrap:wrap}
+.radius button{background:transparent;border:1px solid var(--ai-3);border-radius:999px;padding:5px 14px;font-size:.88rem;color:var(--dim)}
+.radius button[aria-pressed="true"]{background:var(--kinari);color:var(--ai);border-color:var(--kinari);font-weight:600}
+
+.year{font-family:var(--serif);font-size:1.3rem;color:var(--brass);margin:22px 0 4px;letter-spacing:.05em}
+ol.days{list-style:none;margin:0;padding:0}
+ol.days a{display:grid;grid-template-columns:6.2em 1fr auto;gap:10px;align-items:baseline;
+  padding:11px 4px;border-bottom:1px solid var(--ai-2);color:inherit;text-decoration:none}
+ol.days a:active{background:var(--ai-2)}
+.d{font-variant-numeric:tabular-nums;font-weight:600}
+.what{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.what.pass{color:var(--dim)}
+.what .lab{color:var(--asagi);margin-left:.5em}
+.dist{color:var(--dim);font-size:.8rem;font-variant-numeric:tabular-nums}
+.more{color:var(--dim);text-align:center;font-size:.85rem;margin-top:14px}
+
+.note{text-align:center;color:var(--dim);max-width:22em;margin:0 auto;font-size:.95rem}
+.note.err{color:var(--beni)}
+
+.cta{position:fixed;left:0;right:0;bottom:0;padding:14px 20px calc(14px + env(safe-area-inset-bottom,0px));
+  background:linear-gradient(to top,var(--ai) 70%,transparent)}
+.cta button{display:block;width:100%;max-width:520px;margin:0 auto;padding:15px;border:0;border-radius:14px;
+  background:var(--brass);color:var(--ai);font-weight:700;font-size:1.05rem;letter-spacing:.06em}
+.cta button:disabled{opacity:.55}
+
+/* ---- settings ---- */
+dialog{background:var(--ai-2);color:var(--kinari);border:0;border-radius:18px;padding:22px;width:min(92vw,440px)}
+dialog::backdrop{background:rgb(8 14 26 / .7)}
+dialog h2{font-family:var(--serif);font-size:1.1rem;margin:0 0 14px}
+dialog section{padding:14px 0;border-top:1px solid var(--ai-3)}
+dialog section:first-of-type{border-top:0;padding-top:0}
+dialog p{margin:0 0 10px;font-size:.9rem;color:var(--dim)}
+dialog .count{font-size:1.4rem;color:var(--kinari);font-variant-numeric:tabular-nums}
+.btn{background:var(--ai-3);border:0;border-radius:10px;padding:10px 16px;font-weight:600}
+.btn.primary{background:var(--brass);color:var(--ai)}
+.btn.danger{background:none;color:var(--beni);padding-left:0}
+.row{display:flex;gap:8px}
+.row input{flex:1;min-width:0;background:var(--ai);border:1px solid var(--ai-3);border-radius:10px;padding:9px 12px}
+#status{min-height:1.4em;font-size:.88rem;color:var(--asagi);margin-top:8px}
+.close{float:right;margin:-8px -8px 0 0}
+</style>
+</head>
+<body>
+<header>
+  <h1>来たことある？</h1>
+  <button class="icon-btn" id="openSettings" aria-label="データと設定">
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 7h10M18 7h2M4 17h4M12 17h8"/><circle cx="16" cy="7" r="2"/><circle cx="10" cy="17" r="2"/></svg>
+  </button>
+</header>
+
+<main>
+  <div class="stage" id="stage"></div>
+  <p class="where" id="where"></p>
+  <p class="summary" id="summary"></p>
+  <div class="radius" id="radius" role="group" aria-label="検索範囲"></div>
+  <div id="list"></div>
+</main>
+
+<div class="cta"><button id="go">現在地で調べる</button></div>
+
+<dialog id="settings">
+  <button class="icon-btn close" id="closeSettings" aria-label="閉じる">✕</button>
+  <h2>データと設定</h2>
+  <section>
+    <p>保存されている記録</p>
+    <div class="count" id="count">…</div>
+  </section>
+  <section>
+    <p>Googleマップのタイムラインを書き出した Timeline.json を選んでください。古いTakeoutのJSONも複数まとめて選べます。データはこの端末の中だけに保存されます。</p>
+    <button class="btn primary" id="pick">タイムラインを読み込む</button>
+    <input type="file" id="file" accept=".json,application/json" multiple hidden>
+    <div id="status" aria-live="polite"></div>
+  </section>
+  <section>
+    <p>座標を指定して調べる（例: 35.6812, 139.7671）</p>
+    <div class="row"><input id="coord" inputmode="decimal" placeholder="緯度, 経度"><button class="btn" id="coordGo">調べる</button></div>
+  </section>
+  <section>
+    <button class="btn danger" id="wipe">保存した記録をすべて削除</button>
+  </section>
+</dialog>
+
+<script>
+"use strict";
+const DB_NAME = "wherewasi", STORE = "rec", CELL = 100;   // 0.01度 ≒ 1.1km の格子で索引
+const RADII = [100, 200, 500, 2000];
+const LABELS = {INFERRED_HOME:"自宅", HOME:"自宅", INFERRED_WORK:"職場", WORK:"職場", UNKNOWN:""};
+const WD = "日月火水木金土";
+const $ = id => document.getElementById(id);
+
+let radius = 200;
+try { radius = +localStorage.getItem("radius") || 200; } catch {}
+
+/* ---------- IndexedDB ---------- */
+let dbp;
+function openDB() {
+  return dbp ||= new Promise((res, rej) => {
+    const r = indexedDB.open(DB_NAME, 1);
+    r.onupgradeneeded = () => r.result.createObjectStore(STORE, {keyPath: "id"}).createIndex("cell", "cell");
+    r.onsuccess = () => res(r.result);
+    r.onerror = () => rej(r.error);
+  });
+}
+const cellOf = (lat, lon) => Math.floor(lat * CELL) + "_" + Math.floor(lon * CELL);
+
+async function putBatch(rows) {
+  const db = await openDB();
+  return new Promise((res, rej) => {
+    const tx = db.transaction(STORE, "readwrite"), s = tx.objectStore(STORE);
+    rows.forEach(r => s.put(r));
+    tx.oncomplete = res; tx.onerror = () => rej(tx.error);
+  });
+}
+async function countAll() {
+  const db = await openDB();
+  return new Promise(res => { const r = db.transaction(STORE).objectStore(STORE).count(); r.onsuccess = () => res(r.result); r.onerror = () => res(0); });
+}
+async function wipeAll() {
+  const db = await openDB();
+  return new Promise(res => { const tx = db.transaction(STORE, "readwrite"); tx.objectStore(STORE).clear(); tx.oncomplete = res; });
+}
+
+/* ---------- 取り込み ---------- */
+function parseLatLng(s) {
+  const v = String(s || "").match(/-?\d+(?:\.\d+)?/g);
+  return v && v.length >= 2 ? [parseFloat(v[0]), parseFloat(v[1])] : null;
+}
+function rec(t, te, lat, lon, kind, label) {
+  return {id: `${kind}|${t}|${lat.toFixed(6)}|${lon.toFixed(6)}`, t, te: te || null, lat, lon, kind, label: label || null, cell: cellOf(lat, lon)};
+}
+function* iterRecords(data) {
+  if (!data || typeof data !== "object" || Array.isArray(data)) return;
+  // 新形式: Android からエクスポートした Timeline.json
+  for (const seg of data.semanticSegments || []) {
+    const v = seg.visit;
+    if (v) {
+      const c = v.topCandidate || {}, ll = parseLatLng(c.placeLocation && c.placeLocation.latLng);
+      if (ll && seg.startTime) yield rec(seg.startTime, seg.endTime, ll[0], ll[1], "visit", c.semanticType);
+    }
+    for (const p of seg.timelinePath || []) {
+      const ll = parseLatLng(p.point);
+      if (ll && p.time) yield rec(p.time, null, ll[0], ll[1], "path");
+    }
+  }
+  // 旧 Takeout: Semantic Location History
+  for (const o of data.timelineObjects || []) {
+    const pv = o.placeVisit;
+    if (pv && pv.location && "latitudeE7" in pv.location) {
+      const d = pv.duration || {}, l = pv.location;
+      if (d.startTimestamp) yield rec(d.startTimestamp, d.endTimestamp, l.latitudeE7 / 1e7, l.longitudeE7 / 1e7, "visit", l.name);
+    }
+  }
+  // 旧 Takeout: Records.json
+  for (const p of data.locations || []) {
+    if ("latitudeE7" in p && p.timestamp) yield rec(p.timestamp, null, p.latitudeE7 / 1e7, p.longitudeE7 / 1e7, "path");
+  }
+}
+async function importFiles(files) {
+  const st = $("status"); let total = 0;
+  $("pick").disabled = true;
+  for (const f of files) {
+    st.textContent = `${f.name} を読み込み中…`;
+    let data;
+    try { data = JSON.parse(await f.text()); }
+    catch { st.textContent = `${f.name} はJSONとして読めませんでした。`; continue; }
+    let batch = [], n = 0;
+    for (const r of iterRecords(data)) {
+      batch.push(r);
+      if (batch.length >= 5000) { await putBatch(batch); n += batch.length; batch = []; st.textContent = `${f.name}：${n.toLocaleString()} 件処理済み`; }
+    }
+    if (batch.length) { await putBatch(batch); n += batch.length; }
+    total += n;
+  }
+  $("pick").disabled = false;
+  st.textContent = total ? `${total.toLocaleString()} 件を読み込みました。` : "読み込める記録が見つかりませんでした。書き出したファイルの形式を確認してください。";
+  refreshCount();
+  if (total) run();
+}
+
+/* ---------- 検索 ---------- */
+function haversine(a1, o1, a2, o2) {
+  const R = 6371000, r = Math.PI / 180, dp = (a2 - a1) * r, dl = (o2 - o1) * r;
+  const h = Math.sin(dp / 2) ** 2 + Math.cos(a1 * r) * Math.cos(a2 * r) * Math.sin(dl / 2) ** 2;
+  return 2 * R * Math.asin(Math.sqrt(h));
+}
+async function nearby(lat, lon, rad) {
+  const dlat = rad / 111320, dlon = rad / (111320 * Math.max(Math.cos(lat * Math.PI / 180), 0.01));
+  const cells = [];
+  for (let a = Math.floor((lat - dlat) * CELL); a <= Math.floor((lat + dlat) * CELL); a++)
+    for (let o = Math.floor((lon - dlon) * CELL); o <= Math.floor((lon + dlon) * CELL); o++) cells.push(a + "_" + o);
+  const db = await openDB(), idx = db.transaction(STORE).objectStore(STORE).index("cell");
+  const got = await Promise.all(cells.map(c => new Promise(res => { const r = idx.getAll(c); r.onsuccess = () => res(r.result); r.onerror = () => res([]); })));
+  return got.flat();
+}
+function dayKey(t) {
+  if (/Z$/.test(t)) { const d = new Date(t); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`; }
+  return t.slice(0, 10);   // 記録された現地の日付
+}
+function minutes(t, te) {
+  const m = (new Date(te) - new Date(t)) / 60000;
+  return Number.isFinite(m) && m > 0 ? Math.round(m) : 0;
+}
+function aggregate(rows, lat, lon, rad) {
+  const days = new Map();
+  for (const r of rows) {
+    const dist = haversine(lat, lon, r.lat, r.lon);
+    if (dist > rad) continue;
+    const k = dayKey(r.t);
+    let d = days.get(k);
+    if (!d) days.set(k, d = {stay: null, label: null, dist, lat: r.lat, lon: r.lon});
+    if (dist < d.dist) Object.assign(d, {dist, lat: r.lat, lon: r.lon});
+    if (r.kind === "visit") {
+      const m = minutes(r.t, r.te);
+      if (d.stay === null || m > d.stay) { d.stay = m; d.label = r.label; }
+    }
+  }
+  return days;
+}
+function since(day) {
+  const d = new Date(day + "T00:00"), now = new Date();
+  const months = (now.getFullYear() - d.getFullYear()) * 12 + now.getMonth() - d.getMonth() - (now.getDate() < d.getDate() ? 1 : 0);
+  if (months <= 0) {
+    const days = Math.round((new Date(now.toDateString()) - d) / 86400000);
+    return days <= 0 ? "今日も来ています" : `${days}日ぶり`;
+  }
+  const y = Math.floor(months / 12), m = months % 12;
+  return (y ? `${y}年` : "") + (m ? `${m}か月` : "") + "ぶり";
+}
+const fmtDay = k => k.replace(/-/g, ".");
+function fmtStay(m) { const h = Math.floor(m / 60), mm = m % 60; return h ? `滞在 ${h}時間${mm ? mm + "分" : ""}` : `滞在 ${mm}分`; }
+const esc = s => String(s).replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"})[c]);
+
+/* ---------- 描画 ---------- */
+function stamp(cls, top, big, bottom, press) {
+  $("stage").innerHTML = `<div class="stamp ${cls}${press ? " press" : ""}"><div><div class="top">${top}</div><div class="big">${big}</div><div class="bottom">${bottom}</div></div></div>`;
+}
+function clearInfo() { $("where").textContent = ""; $("summary").innerHTML = ""; $("list").innerHTML = ""; }
+function note(msg, err) { $("list").innerHTML = `<p class="note${err ? " err" : ""}">${msg}</p>`; }
+
+function renderRadius() {
+  $("radius").innerHTML = RADII.map(r => `<button data-r="${r}" aria-pressed="${r === radius}">${r >= 1000 ? r / 1000 + "km" : r + "m"}</button>`).join("");
+}
+
+let last = null;   // 最後に調べた地点
+async function show(lat, lon, acc) {
+  last = {lat, lon, acc};
+  const days = aggregate(await nearby(lat, lon, radius), lat, lon, radius);
+  $("where").textContent = `${lat.toFixed(5)}, ${lon.toFixed(5)}` + (acc ? `（精度 ±${Math.round(acc)}m）` : "");
+  if (!days.size) {
+    stamp("first", "記録なし", "はじめて", `半径${radius >= 1000 ? radius / 1000 + "km" : radius + "m"}以内`, true);
+    $("summary").innerHTML = ""; $("list").innerHTML = "";
+    return;
+  }
+  const keys = [...days.keys()].sort().reverse();
+  const stays = keys.filter(k => days.get(k).stay !== null).length;
+  stamp("", "前回", fmtDay(keys[0]), since(keys[0]), true);
+  $("summary").innerHTML = `記録 ${keys.length}日（滞在 ${stays}日、通過 ${keys.length - stays}日）<br><span class="first-day">初回 ${fmtDay(keys.at(-1))}</span>`;
+
+  const LIMIT = 200; let html = "", year = "";
+  for (const k of keys.slice(0, LIMIT)) {
+    const d = days.get(k), y = k.slice(0, 4);
+    if (y !== year) { html += (year ? "</ol>" : "") + `<h3 class="year">${y}</h3><ol class="days">`; year = y; }
+    const wd = WD[new Date(k + "T00:00").getDay()] || "";
+    const lab = d.label ? (LABELS[d.label] ?? d.label) : "";
+    const what = d.stay !== null ? `${fmtStay(d.stay)}${lab ? `<span class="lab">${esc(lab)}</span>` : ""}` : "通過";
+    html += `<li><a href="https://www.google.com/maps?q=${d.lat},${d.lon}" target="_blank" rel="noopener">
+      <span class="d">${k.slice(5).replace("-", ".")}（${wd}）</span>
+      <span class="what${d.stay === null ? " pass" : ""}">${what}</span>
+      <span class="dist">${Math.round(d.dist)}m</span></a></li>`;
+  }
+  html += "</ol>";
+  if (keys.length > LIMIT) html += `<p class="more">ほか ${keys.length - LIMIT}日</p>`;
+  $("list").innerHTML = html;
+}
+
+function locate() {
+  return new Promise((res, rej) => {
+    if (!navigator.geolocation) return rej(new Error("このブラウザは位置情報に対応していません。"));
+    navigator.geolocation.getCurrentPosition(
+      p => res(p.coords),
+      e => rej(new Error(e.code === 1 ? "位置情報の利用が許可されていません。Chromeのサイト設定で位置情報を許可してください。"
+                        : e.code === 3 ? "位置情報の取得に時間がかかりすぎました。屋外で試すか、もう一度押してください。"
+                        : "位置情報を取得できませんでした。端末の位置情報がオンか確認してください。")),
+      {enableHighAccuracy: true, timeout: 20000, maximumAge: 30000});
+  });
+}
+
+async function run() {
+  if (!(await countAll())) { showEmpty(); return; }
+  const go = $("go"); go.disabled = true; go.textContent = "現在地を取得中…";
+  clearInfo();
+  stamp("wait", "現在地を", "取得中", "しばらくお待ちください", false);
+  try {
+    const c = await locate();
+    await show(c.latitude, c.longitude, c.accuracy);
+  } catch (e) {
+    stamp("wait", "", "？", "", false);
+    note(esc(e.message), true);
+  } finally {
+    go.disabled = false; go.textContent = "現在地で調べる";
+  }
+}
+
+function showEmpty() {
+  clearInfo();
+  stamp("wait", "", "未読込", "", false);
+  $("list").innerHTML = `<p class="note">まずGoogleマップのタイムラインを読み込んでください。<br>Android の「設定 → 位置情報 → 位置情報サービス → タイムライン → タイムラインデータをエクスポート」で書き出せます。</p>
+    <p style="text-align:center;margin-top:18px"><button class="btn primary" onclick="openSettings()">タイムラインを読み込む</button></p>`;
+}
+
+async function refreshCount() { $("count").textContent = (await countAll()).toLocaleString() + " 件"; }
+function openSettings() { refreshCount(); $("settings").showModal(); }
+
+/* ---------- イベント ---------- */
+$("go").onclick = run;
+$("openSettings").onclick = openSettings;
+$("closeSettings").onclick = () => $("settings").close();
+$("pick").onclick = () => $("file").click();
+$("file").onchange = e => { if (e.target.files.length) importFiles([...e.target.files]); e.target.value = ""; };
+$("coordGo").onclick = () => {
+  const ll = parseLatLng($("coord").value);
+  if (!ll) { $("coord").focus(); return; }
+  $("settings").close(); show(ll[0], ll[1]);
+};
+$("wipe").onclick = async () => {
+  if (!confirm("保存した記録をすべて削除します。よろしいですか？")) return;
+  await wipeAll(); refreshCount(); showEmpty();
+};
+$("radius").onclick = e => {
+  const b = e.target.closest("button[data-r]"); if (!b) return;
+  radius = +b.dataset.r; try { localStorage.setItem("radius", radius); } catch {}
+  renderRadius();
+  if (last) show(last.lat, last.lon, last.acc);
+};
+
+renderRadius();
+run();   // 開いたらすぐ調べる
+
+if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js").catch(() => {});
+if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(() => {});
+</script>
+</body>
+</html>
