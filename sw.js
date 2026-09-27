@@ -1,5 +1,5 @@
 // アプリを更新したら VERSION の数字を上げる
-const VERSION = "kitakoto-v1";
+const VERSION = "kitakoto-v2";
 const ASSETS = ["./", "./index.html", "./manifest.webmanifest", "./icon-192.png", "./icon-512.png"];
 
 self.addEventListener("install", e => {

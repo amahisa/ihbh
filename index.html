@@ -59,9 +59,20 @@ main{max-width:560px;margin:0 auto;padding:8px 20px calc(120px + env(safe-area-i
 
 .year{font-family:var(--serif);font-size:1.3rem;color:var(--brass);margin:22px 0 4px;letter-spacing:.05em}
 ol.days{list-style:none;margin:0;padding:0}
-ol.days a{display:grid;grid-template-columns:6.2em 1fr auto;gap:10px;align-items:baseline;
-  padding:11px 4px;border-bottom:1px solid var(--ai-2);color:inherit;text-decoration:none}
-ol.days a:active{background:var(--ai-2)}
+ol.days li{border-bottom:1px solid var(--ai-2)}
+ol.days summary{display:grid;grid-template-columns:6.2em 1fr auto;gap:10px;align-items:baseline;
+  padding:11px 4px;list-style:none;cursor:pointer}
+ol.days summary::-webkit-details-marker{display:none}
+ol.days summary:active,ol.days details[open] summary{background:var(--ai-2)}
+ol.days details .acts{padding:2px 4px 12px}
+
+/* 日付ごとの行き先（タイムライン・フォト・地点） */
+.latest{text-align:center;margin:0 0 22px}
+.latest p{margin:0 0 8px;color:var(--dim);font-size:.82rem}
+.acts{display:flex;flex-wrap:wrap;gap:8px}
+.latest .acts{justify-content:center}
+.acts a{border:1px solid var(--brass);color:var(--brass);border-radius:999px;padding:6px 14px;font-size:.88rem;text-decoration:none}
+.acts a:active{background:var(--brass);color:var(--ai)}
 .d{font-variant-numeric:tabular-nums;font-weight:600}
 .what{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .what.pass{color:var(--dim)}
@@ -107,6 +118,7 @@ dialog .count{font-size:1.4rem;color:var(--kinari);font-variant-numeric:tabular-
   <div class="stage" id="stage"></div>
   <p class="where" id="where"></p>
   <p class="summary" id="summary"></p>
+  <div class="latest" id="latest"></div>
   <div class="radius" id="radius" role="group" aria-label="検索範囲"></div>
   <div id="list"></div>
 </main>
@@ -285,11 +297,30 @@ const fmtDay = k => k.replace(/-/g, ".");
 function fmtStay(m) { const h = Math.floor(m / 60), mm = m % 60; return h ? `滞在 ${h}時間${mm ? mm + "分" : ""}` : `滞在 ${mm}分`; }
 const esc = s => String(s).replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"})[c]);
 
+/* ---------- リンク ---------- */
+// 日付指定の公式ディープリンクは無いため、非公式の形式を使う。効かなくなったらここだけ直す。
+const mapLink = (lat, lon) => `https://www.google.com/maps?q=${lat},${lon}`;
+function dayLinks(k) {
+  const [y, m, d] = k.split("-").map(Number), text = `${y}年${m}月${d}日`;
+  return {
+    timeline: `https://www.google.com/maps/timeline?pb=!1m2!1m1!1s${k}`,
+    photos: "https://photos.google.com/search/" + encodeURIComponent(text),
+    amazon: "https://www.amazon.co.jp/photos/all",   // 日付検索のURLが無いので、日付をコピーして検索欄に貼れるようにする
+    amazonText: text,
+  };
+}
+function actions(k, lat, lon) {
+  const l = dayLinks(k), a = (href, label, copy) =>
+    `<a href="${href}" target="_blank" rel="noopener"${copy ? ` data-copy="${esc(copy)}"` : ""}>${label}</a>`;
+  return a(l.timeline, "タイムライン") + a(l.photos, "Google フォト") +
+         a(l.amazon, "Amazon フォト", l.amazonText) + a(mapLink(lat, lon), "地点");
+}
+
 /* ---------- 描画 ---------- */
 function stamp(cls, top, big, bottom, press) {
   $("stage").innerHTML = `<div class="stamp ${cls}${press ? " press" : ""}"><div><div class="top">${top}</div><div class="big">${big}</div><div class="bottom">${bottom}</div></div></div>`;
 }
-function clearInfo() { $("where").textContent = ""; $("summary").innerHTML = ""; $("list").innerHTML = ""; }
+function clearInfo() { $("where").textContent = ""; $("summary").innerHTML = ""; $("latest").innerHTML = ""; $("list").innerHTML = ""; }
 function note(msg, err) { $("list").innerHTML = `<p class="note${err ? " err" : ""}">${msg}</p>`; }
 
 function renderRadius() {
@@ -303,13 +334,15 @@ async function show(lat, lon, acc) {
   $("where").textContent = `${lat.toFixed(5)}, ${lon.toFixed(5)}` + (acc ? `（精度 ±${Math.round(acc)}m）` : "");
   if (!days.size) {
     stamp("first", "記録なし", "はじめて", `半径${radius >= 1000 ? radius / 1000 + "km" : radius + "m"}以内`, true);
-    $("summary").innerHTML = ""; $("list").innerHTML = "";
+    $("summary").innerHTML = ""; $("latest").innerHTML = ""; $("list").innerHTML = "";
     return;
   }
   const keys = [...days.keys()].sort().reverse();
   const stays = keys.filter(k => days.get(k).stay !== null).length;
   stamp("", "前回", fmtDay(keys[0]), since(keys[0]), true);
   $("summary").innerHTML = `記録 ${keys.length}日（滞在 ${stays}日、通過 ${keys.length - stays}日）<br><span class="first-day">初回 ${fmtDay(keys.at(-1))}</span>`;
+  const top = days.get(keys[0]);
+  $("latest").innerHTML = `<p>${fmtDay(keys[0])} を開く</p><div class="acts">${actions(keys[0], top.lat, top.lon)}</div>`;
 
   const LIMIT = 200; let html = "", year = "";
   for (const k of keys.slice(0, LIMIT)) {
@@ -318,10 +351,11 @@ async function show(lat, lon, acc) {
     const wd = WD[new Date(k + "T00:00").getDay()] || "";
     const lab = d.label ? (LABELS[d.label] ?? d.label) : "";
     const what = d.stay !== null ? `${fmtStay(d.stay)}${lab ? `<span class="lab">${esc(lab)}</span>` : ""}` : "通過";
-    html += `<li><a href="https://www.google.com/maps?q=${d.lat},${d.lon}" target="_blank" rel="noopener">
+    html += `<li><details><summary>
       <span class="d">${k.slice(5).replace("-", ".")}（${wd}）</span>
       <span class="what${d.stay === null ? " pass" : ""}">${what}</span>
-      <span class="dist">${Math.round(d.dist)}m</span></a></li>`;
+      <span class="dist">${Math.round(d.dist)}m</span></summary>
+      <div class="acts">${actions(k, d.lat, d.lon)}</div></details></li>`;
   }
   html += "</ol>";
   if (keys.length > LIMIT) html += `<p class="more">ほか ${keys.length - LIMIT}日</p>`;
@@ -367,6 +401,11 @@ async function refreshCount() { $("count").textContent = (await countAll()).toLo
 function openSettings() { refreshCount(); $("settings").showModal(); }
 
 /* ---------- イベント ---------- */
+// Amazon フォトは日付検索のURLが無いので、開く前に日付をクリップボードへ
+document.addEventListener("click", e => {
+  const a = e.target.closest("a[data-copy]");
+  if (a && navigator.clipboard) navigator.clipboard.writeText(a.dataset.copy).catch(() => {});
+});
 $("go").onclick = run;
 $("openSettings").onclick = openSettings;
 $("closeSettings").onclick = () => $("settings").close();
