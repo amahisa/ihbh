@@ -300,13 +300,20 @@ const esc = s => String(s).replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":
 /* ---------- リンク ---------- */
 // 日付指定の公式ディープリンクは無いため、非公式の形式を使う。効かなくなったらここだけ直す。
 const mapLink = (lat, lon) => `https://www.google.com/maps?q=${lat},${lon}`;
-function dayLinks(k) {
+const AMAZON_PHOTOS_WEB = "https://www.amazon.co.jp/photos/all";
+const AMAZON_PHOTOS_PKG = "com.amazon.clouddrive.photos";   // Amazon Photos アプリのパッケージ名。未検証: 実機で要確認
+// スマホ（Android）はアプリを開く。未インストールなら intent:// が自動でWeb版にフォールバックする。PCなどはそのままWeb版
+function amazonHref(ua) {
+  if (!/Android/.test(ua || "")) return AMAZON_PHOTOS_WEB;
+  return `intent://www.amazon.co.jp/photos/all#Intent;scheme=https;package=${AMAZON_PHOTOS_PKG};S.browser_fallback_url=${encodeURIComponent(AMAZON_PHOTOS_WEB)};end`;
+}
+function dayLinks(k, ua) {
   const [y, m, d] = k.split("-").map(Number), text = `${y}年${m}月${d}日`;
   return {
     timeline: `https://www.google.com/maps/timeline?pb=!1m2!1m1!1s${k}`,
     photos: "https://photos.google.com/search/" + encodeURIComponent(text),
-    amazon: "https://www.amazon.co.jp/photos/all",   // 日付検索のURLが無いので、日付をコピーして検索欄に貼れるようにする
-    amazonText: text,
+    amazon: amazonHref(ua ?? (typeof navigator !== "undefined" ? navigator.userAgent : "")),
+    amazonText: text,   // 日付検索のURLが無いので、日付をコピーして検索欄に貼れるようにする
   };
 }
 function actions(k, lat, lon) {
