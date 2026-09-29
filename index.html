@@ -97,6 +97,8 @@ dialog section{padding:14px 0;border-top:1px solid var(--ai-3)}
 dialog section:first-of-type{border-top:0;padding-top:0}
 dialog p{margin:0 0 10px;font-size:.9rem;color:var(--dim)}
 dialog .count{font-size:1.4rem;color:var(--kinari);font-variant-numeric:tabular-nums}
+#persist{font-size:.82rem;margin:6px 0 0}
+#persist.err{color:var(--beni)}
 .btn{background:var(--ai-3);border:0;border-radius:10px;padding:10px 16px;font-weight:600}
 .btn.primary{background:var(--brass);color:var(--ai)}
 .btn.danger{background:none;color:var(--beni);padding-left:0}
@@ -131,12 +133,17 @@ dialog .count{font-size:1.4rem;color:var(--kinari);font-variant-numeric:tabular-
   <section>
     <p>保存されている記録</p>
     <div class="count" id="count">…</div>
+    <p id="persist" aria-live="polite"></p>
   </section>
   <section>
-    <p>Googleマップのタイムラインを書き出した Timeline.json を選んでください。古いTakeoutのJSONも複数まとめて選べます。データはこの端末の中だけに保存されます。</p>
+    <p>Googleマップのタイムラインを書き出した Timeline.json を選んでください。古いTakeoutのJSONも複数まとめて選べます。このアプリで書き出したバックアップファイルも読み込めます。データはこの端末の中だけに保存されます。</p>
     <button class="btn primary" id="pick">タイムラインを読み込む</button>
     <input type="file" id="file" accept=".json,application/json" multiple hidden>
     <div id="status" aria-live="polite"></div>
+  </section>
+  <section>
+    <p>記録をファイルに書き出してバックアップできます。端末の空き容量が少ない時などにブラウザが記録を消してしまうことがあるので、時々書き出しておくと安心です。書き出したファイルは上の「読み込み」からいつでも戻せます。</p>
+    <button class="btn" id="exportBtn">バックアップを書き出す</button>
   </section>
   <section>
     <p>座標を指定して調べる（例: 35.6812, 139.7671）</p>
@@ -186,6 +193,10 @@ async function wipeAll() {
   const db = await openDB();
   return new Promise(res => { const tx = db.transaction(STORE, "readwrite"); tx.objectStore(STORE).clear(); tx.oncomplete = res; });
 }
+async function getAllRecords() {
+  const db = await openDB();
+  return new Promise(res => { const r = db.transaction(STORE).objectStore(STORE).getAll(); r.onsuccess = () => res(r.result); r.onerror = () => res([]); });
+}
 
 /* ---------- 取り込み ---------- */
 function parseLatLng(s) {
@@ -195,8 +206,21 @@ function parseLatLng(s) {
 function rec(t, te, lat, lon, kind, label) {
   return {id: `${kind}|${t}|${lat.toFixed(6)}|${lon.toFixed(6)}`, t, te: te || null, lat, lon, kind, label: label || null, cell: cellOf(lat, lon)};
 }
+const BACKUP_APP = "kitakoto";
+// このアプリ自身が書き出したバックアップJSONを表現する。id/cell は取り込み時に rec() で再計算するので保存しない
+function backupPayload(records) {
+  return {app: BACKUP_APP, version: 1, exportedAt: new Date().toISOString(), count: records.length,
+    records: records.map(r => ({t: r.t, te: r.te, lat: r.lat, lon: r.lon, kind: r.kind, label: r.label}))};
+}
 function* iterRecords(data) {
   if (!data || typeof data !== "object" || Array.isArray(data)) return;
+  // このアプリが書き出したバックアップJSON
+  if (data.app === BACKUP_APP && Array.isArray(data.records)) {
+    for (const r of data.records) {
+      if (r && typeof r.lat === "number" && typeof r.lon === "number" && r.t && r.kind) yield rec(r.t, r.te, r.lat, r.lon, r.kind, r.label);
+    }
+    return;
+  }
   // 新形式: Android からエクスポートした Timeline.json
   for (const seg of data.semanticSegments || []) {
     const v = seg.visit;
@@ -242,6 +266,29 @@ async function importFiles(files) {
   st.textContent = total ? `${total.toLocaleString()} 件を読み込みました。` : "読み込める記録が見つかりませんでした。書き出したファイルの形式を確認してください。";
   refreshCount();
   if (total) run();
+}
+
+/* ---------- 永続化・バックアップ ---------- */
+// ストレージの空き容量が少ない時などに、ブラウザがサイトのデータを勝手に消すことがある。
+// persist() が通れば消されにくくなる（Androidでは主にホーム画面に追加すると通りやすい）
+async function refreshPersist() {
+  const el = $("persist");
+  if (!el) return;
+  if (!(navigator.storage && navigator.storage.persist && navigator.storage.persisted)) { el.textContent = ""; return; }
+  const ok = (await navigator.storage.persisted()) || (await navigator.storage.persist());
+  el.textContent = ok ? "永続保存：有効（自動では消えにくくなっています）"
+    : "永続保存：無効（ホーム画面に追加すると有効になりやすくなります）";
+  el.classList.toggle("err", !ok);
+}
+async function exportBackup() {
+  const records = await getAllRecords();
+  if (!records.length) return;
+  const blob = new Blob([JSON.stringify(backupPayload(records))], {type: "application/json"});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url; a.download = `kitakoto-backup-${new Date().toISOString().slice(0, 10)}.json`;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 30000);
 }
 
 /* ---------- 検索 ---------- */
@@ -405,7 +452,7 @@ function showEmpty() {
 }
 
 async function refreshCount() { $("count").textContent = (await countAll()).toLocaleString() + " 件"; }
-function openSettings() { refreshCount(); $("settings").showModal(); }
+function openSettings() { refreshCount(); refreshPersist(); $("settings").showModal(); }
 
 /* ---------- イベント ---------- */
 // Amazon フォトは日付検索のURLが無いので、開く前に日付をクリップボードへ
@@ -427,6 +474,7 @@ $("wipe").onclick = async () => {
   if (!confirm("保存した記録をすべて削除します。よろしいですか？")) return;
   await wipeAll(); refreshCount(); showEmpty();
 };
+$("exportBtn").onclick = exportBackup;
 $("radius").onclick = e => {
   const b = e.target.closest("button[data-r]"); if (!b) return;
   radius = +b.dataset.r; try { localStorage.setItem("radius", radius); } catch {}
@@ -438,7 +486,7 @@ renderRadius();
 run();   // 開いたらすぐ調べる
 
 if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js").catch(() => {});
-if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(() => {});
+refreshPersist();
 </script>
 </body>
 </html>

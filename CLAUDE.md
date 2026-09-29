@@ -15,13 +15,14 @@ Androidスマホで「今いる場所に過去来たことがあるか、いつ�
 - `manifest.webmanifest`, `icon-192.png`, `icon-512.png`
 
 ## データ仕様
-入力として3形式に対応（`iterRecords()`）:
+入力として4形式に対応（`iterRecords()`）:
 1. Android端末エクスポートの `Timeline.json`：`semanticSegments[]`
    - `visit.topCandidate.placeLocation.latLng`（"35.6812°, 139.7671°" 形式の文字列）、`semanticType`、`startTime`/`endTime` → kind=`visit`
    - `timelinePath[].point` / `.time` → kind=`path`（通過）
    - `rawSignals`、`userLocationProfile` は未使用
 2. 旧Takeout Semantic Location History：`timelineObjects[].placeVisit`（`latitudeE7`、`location.name` をラベルに）
 3. 旧Takeout `Records.json`：`locations[]` → path
+4. このアプリ自身が書き出したバックアップJSON（`{app:"kitakoto", records:[...]}`、`backupPayload()`）：設定ダイアログの「バックアップを書き出す」で作れる。読み込み欄にそのまま渡せば戻せる
 
 IndexedDB `wherewasi` / store `rec`
 - keyPath `id` = `kind|t|lat(6桁)|lon(6桁)`（再読込しても重複しない）
@@ -34,7 +35,9 @@ IndexedDB `wherewasi` / store `rec`
 - 半径 100m / 200m / 500m / 2km（localStorage に保存）
 - 年ごとの一覧。行をタップすると展開し、その日の「タイムライン / Google フォト / Amazon フォト / 地点」を開ける。前回の日付分はスタンプの下にも常時表示（`dayLinks()`）
   - 日付指定の公式ディープリンクは無く、**実機で未検証**。Google フォトは日付文字列の検索、タイムラインは非公式の `maps/timeline?pb=!1m2!1m1!1s日付`、Amazon フォトは日付をコピーしてトップを開くだけ
-- 設定ダイアログ：件数表示、読み込み（複数ファイル可）、座標を手入力して検索、全削除
+- 設定ダイアログ：件数表示、永続保存の状態表示（`refreshPersist()`）、読み込み（複数ファイル可）、バックアップ書き出し（`exportBackup()`）、座標を手入力して検索、全削除
+  - **端末のストレージが逼迫するとブラウザがIndexedDBを勝手に消すことがある**問題への対策として、`navigator.storage.persist()` を起動時と設定を開くたびにリクエストし、可否を表示する。Androidではホーム画面に追加すると通りやすい。これでも消える可能性はゼロではないので、バックアップ書き出しを別途用意した
+  - 全削除は既存の意図的な操作（`wipeAll()`）。バックアップはその前に取っておくためのもの
 
 ## 状態
 - ダミーデータで構文チェック・ロジック・表示は確認済み
