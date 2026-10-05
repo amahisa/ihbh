@@ -13,6 +13,7 @@ Androidスマホで「今いる場所に過去来たことがあるか、いつ�
 - `index.html` … UI・ロジックすべて（CSS/JSインライン）
 - `sw.js` … キャッシュファースト。**アプリを変更したら `VERSION` を上げる**
 - `manifest.webmanifest`, `icon-192.png`, `icon-512.png`
+- `tools/photo_exif.py` … PC/NASで動かす補助スクリプト（アプリ本体とは別。Python標準ライブラリのみ）。写真のEXIFから位置と日時を読み、アプリに読み込めるJSONを書き出す。テストは `python3 -m unittest discover -s tools`
 
 ## データ仕様
 入力として4形式に対応（`iterRecords()`）:
@@ -23,6 +24,10 @@ Androidスマホで「今いる場所に過去来たことがあるか、いつ�
 2. 旧Takeout Semantic Location History：`timelineObjects[].placeVisit`（`latitudeE7`、`location.name` をラベルに）
 3. 旧Takeout `Records.json`：`locations[]` → path
 4. このアプリ自身が書き出したバックアップJSON（`{app:"kitakoto", records:[...]}`、`backupPayload()`）：設定ダイアログの「バックアップを書き出す」で作れる。読み込み欄にそのまま渡せば戻せる
+   - 写真のEXIF由来のデータもこの形式で渡す（`tools/photo_exif.py` が出力）。kind=`photo`、`t` は撮影日時（EXIFの現地時刻。タイムゾーン差があれば `+09:00` 付き）。
+   - アプリでは、写真だけの日は「写真 N枚」（真鍮色ではなく通常色、通過のような薄い表示にはしない）、滞在した日には滞在に加えて「写真 N枚」を真鍮色で添える。件数の内訳は「滞在／写真／通過」で、1日は 滞在 > 写真 > 通過 の順で1つに分類（`describeDay()` / `countDays()`）
+
+読み込みは複数ファイルを一度に選べる（Timeline.json、旧Takeout、写真由来のJSONなどを混在可）。同じ記録は id で重複排除される。
 
 IndexedDB `wherewasi` / store `rec`
 - keyPath `id` = `kind|t|lat(6桁)|lon(6桁)`（再読込しても重複しない）
